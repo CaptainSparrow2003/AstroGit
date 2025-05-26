@@ -3,179 +3,103 @@
 /**
  * Auth Configuration Checker
  * 
- * This script checks the auth configuration and provides guidance on fixing common issues.
+ * This script checks if the required environment variables for NextAuth
+ * are properly set up in the .env.local file.
  */
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-const { execSync } = require('child_process');
+const dotenv = require('dotenv');
 
-// Colors for terminal output
-const colors = {
-  reset: '\x1b[0m',
-  red: '\x1b[31m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  magenta: '\x1b[35m',
-  cyan: '\x1b[36m',
-  white: '\x1b[37m',
-  bold: '\x1b[1m',
-};
+console.log('🔍 Checking NextAuth configuration...\n');
 
-// Print colored message
-function print(color, message) {
-  console.log(`${colors[color]}${message}${colors.reset}`);
+// Load environment variables from .env.local
+const envPath = path.resolve(process.cwd(), '.env.local');
+let envConfig;
+
+try {
+  if (fs.existsSync(envPath)) {
+    console.log('✅ Found .env.local file');
+    envConfig = dotenv.parse(fs.readFileSync(envPath));
+  } else {
+    console.log('❌ .env.local file not found!');
+    envConfig = {};
+  }
+} catch (error) {
+  console.error('Error reading .env.local file:', error);
+  process.exit(1);
 }
 
-// Print header
-function printHeader(message) {
-  console.log('\n' + colors.bold + colors.cyan + message + colors.reset);
-  console.log('='.repeat(message.length));
+// Check required environment variables
+const requiredVars = [
+  { name: 'NEXTAUTH_URL', description: 'The URL of your site (for callbacks)' },
+  { name: 'NEXTAUTH_SECRET', description: 'Secret used to encrypt tokens' },
+  { name: 'GITHUB_CLIENT_ID', description: 'GitHub OAuth App Client ID' },
+  { name: 'GITHUB_CLIENT_SECRET', description: 'GitHub OAuth App Client Secret' }
+];
+
+let missingVars = 0;
+
+console.log('\n📋 Environment Variables Check:');
+console.log('--------------------------------');
+
+requiredVars.forEach(variable => {
+  const value = envConfig[variable.name] || process.env[variable.name];
+  
+  if (!value) {
+    console.log(`❌ ${variable.name}: MISSING - ${variable.description}`);
+    missingVars++;
+  } else {
+    // Don't show the actual value for secrets
+    const displayValue = variable.name.includes('SECRET') 
+      ? '********' 
+      : value;
+    console.log(`✅ ${variable.name}: ${displayValue}`);
+  }
+});
+
+console.log('--------------------------------');
+
+if (missingVars > 0) {
+  console.log(`\n❌ Found ${missingVars} missing environment variables!`);
+  console.log('\n🛠️ Fix instructions:');
+  console.log('1. Create or edit .env.local in the project root');
+  console.log('2. Add the missing variables listed above');
+  console.log('3. Restart your Next.js development server');
+  
+  if (!envConfig.NEXTAUTH_URL) {
+    console.log('\n💡 For NEXTAUTH_URL, use:');
+    console.log('   • Development: http://localhost:3000');
+    console.log('   • Production: https://your-domain.com');
+  }
+  
+  if (!envConfig.NEXTAUTH_SECRET) {
+    console.log('\n💡 For NEXTAUTH_SECRET, generate a secure random string:');
+    console.log('   • Run: openssl rand -base64 32');
+    console.log('   • Or use a password generator');
+  }
+  
+  if (!envConfig.GITHUB_CLIENT_ID || !envConfig.GITHUB_CLIENT_SECRET) {
+    console.log('\n💡 For GitHub OAuth credentials:');
+    console.log('   1. Go to: https://github.com/settings/developers');
+    console.log('   2. Create a new OAuth App or select an existing one');
+    console.log('   3. Set the Authorization callback URL to:');
+    console.log('      http://localhost:3000/api/auth/callback/github (development)');
+    console.log('   4. Copy the Client ID and Client Secret to your .env.local file');
+  }
+} else {
+  console.log('\n✅ All required environment variables are set!');
 }
 
-// Check if a file exists
-function fileExists(filePath) {
-  try {
-    return fs.existsSync(filePath);
-  } catch (error) {
-    return false;
-  }
+// Check for callback URL configuration if GitHub credentials exist
+if (envConfig.GITHUB_CLIENT_ID && envConfig.GITHUB_CLIENT_SECRET && envConfig.NEXTAUTH_URL) {
+  console.log('\n🔄 Checking OAuth callback URL configuration...');
+  
+  const callbackUrl = new URL('/api/auth/callback/github', envConfig.NEXTAUTH_URL).toString();
+  console.log(`📎 Your GitHub callback URL should be: ${callbackUrl}`);
+  console.log('   Verify this matches the callback URL in your GitHub OAuth app settings');
 }
 
-// Get environment variables from .env.local
-function getEnvVars() {
-  const envPath = path.resolve(process.cwd(), '.env.local');
-  if (!fileExists(envPath)) {
-    return null;
-  }
-
-  const envContent = fs.readFileSync(envPath, 'utf8');
-  const envVars = {};
-
-  envContent.split('\n').forEach(line => {
-    const matches = line.match(/^([^=:#]+?)[=:](.*)$/);
-    if (matches && matches.length > 2) {
-      const key = matches[1].trim();
-      let value = matches[2].trim();
-      
-      // Remove quotes if they exist
-      if ((value.startsWith('"') && value.endsWith('"')) || 
-          (value.startsWith("'") && value.endsWith("'"))) {
-        value = value.substring(1, value.length - 1);
-      }
-      
-      envVars[key] = value;
-    }
-  });
-
-  return envVars;
-}
-
-// Main function
-async function checkAuthConfig() {
-  printHeader('AstroGit Auth Configuration Checker');
-  
-  // Check if .env.local exists
-  const envPath = path.resolve(process.cwd(), '.env.local');
-  if (!fileExists(envPath)) {
-    print('red', '❌ .env.local file not found!');
-    print('yellow', 'Create a .env.local file with the following variables:');
-    print('white', `
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your_secret_key
-GITHUB_CLIENT_ID=your_github_client_id
-GITHUB_CLIENT_SECRET=your_github_client_secret
-    `);
-    return;
-  }
-
-  print('green', '✅ .env.local file found');
-  
-  // Check environment variables
-  const envVars = getEnvVars();
-  if (!envVars) {
-    print('red', '❌ Failed to parse .env.local file');
-    return;
-  }
-
-  printHeader('Environment Variables Check');
-  
-  // Check NEXTAUTH_URL
-  if (!envVars.NEXTAUTH_URL) {
-    print('red', '❌ NEXTAUTH_URL is missing');
-  } else {
-    print('green', `✅ NEXTAUTH_URL: ${envVars.NEXTAUTH_URL}`);
-  }
-  
-  // Check NEXTAUTH_SECRET
-  if (!envVars.NEXTAUTH_SECRET) {
-    print('red', '❌ NEXTAUTH_SECRET is missing');
-  } else if (envVars.NEXTAUTH_SECRET === 'your_nextauth_secret') {
-    print('yellow', '⚠️ NEXTAUTH_SECRET is using a placeholder value');
-  } else {
-    print('green', '✅ NEXTAUTH_SECRET is set');
-  }
-  
-  // Check GitHub credentials
-  if (!envVars.GITHUB_CLIENT_ID) {
-    print('red', '❌ GITHUB_CLIENT_ID is missing');
-  } else {
-    print('green', '✅ GITHUB_CLIENT_ID is set');
-  }
-  
-  if (!envVars.GITHUB_CLIENT_SECRET) {
-    print('red', '❌ GITHUB_CLIENT_SECRET is missing');
-  } else {
-    print('green', '✅ GITHUB_CLIENT_SECRET is set');
-  }
-
-  // Check callback URL
-  const callbackUrl = `${envVars.NEXTAUTH_URL || 'http://localhost:3000'}/api/auth/callback/github`;
-  printHeader('GitHub Callback URL');
-  print('cyan', `Make sure your GitHub OAuth app has this callback URL:`);
-  print('white', callbackUrl);
-
-  // Check required files
-  printHeader('Required Files Check');
-  
-  const requiredFiles = [
-    { path: 'app/api/auth/[...nextauth]/route.ts', name: 'NextAuth API Route' },
-    { path: 'app/api/auth/utils/auth.ts', name: 'Auth Options' },
-    { path: 'app/auth/error/page.tsx', name: 'Error Page' }
-  ];
-  
-  let allFilesExist = true;
-  for (const file of requiredFiles) {
-    const filePath = path.resolve(process.cwd(), file.path);
-    if (fileExists(filePath)) {
-      print('green', `✅ ${file.name} exists`);
-    } else {
-      print('red', `❌ ${file.name} is missing (${file.path})`);
-      allFilesExist = false;
-    }
-  }
-
-  // Summary
-  printHeader('Summary');
-  
-  const missingEnvVars = Object.entries(envVars)
-    .filter(([key, value]) => !value && ['NEXTAUTH_URL', 'NEXTAUTH_SECRET', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET'].includes(key))
-    .map(([key]) => key);
-
-  if (missingEnvVars.length === 0 && allFilesExist) {
-    print('green', '✅ All required configuration appears to be in place');
-    print('yellow', 'If you are still having issues, try running the fix-auth.js script:');
-    print('white', 'node scripts/fix-auth.js');
-  } else {
-    print('red', '❌ There are issues with your auth configuration');
-    print('yellow', 'Run the fix-auth.js script to resolve these issues:');
-    print('white', 'node scripts/fix-auth.js');
-  }
-}
-
-// Run the script
-checkAuthConfig().catch(error => {
-  console.error('Error:', error);
-}); 
+console.log('\n📚 For more help with NextAuth.js setup, visit:');
+console.log('   https://next-auth.js.org/getting-started/example');
+console.log('\n🚀 After fixing any issues, restart your Next.js server\n'); 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [githubData, setGithubData] = useState<GithubData | null>(null);
   const [horoscope, setHoroscope] = useState<Horoscope | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -33,33 +34,65 @@ export default function Dashboard() {
     }
   }, [githubData]);
 
+  const handleSignOut = async () => {
+    try {
+      setIsSigningOut(true);
+      await signOut({ callbackUrl: '/' });
+    } catch (err) {
+      console.error('Error signing out:', err);
+      setIsSigningOut(false);
+    }
+  };
+
   const fetchGithubData = async () => {
     setLoading(true);
     try {
-      // In a real app, we'd use the GitHub username from the session
-      // This is a simplified example
+      // Get the username from the session or use a default
       const username = session?.user?.name || 'octocat';
       
+      console.log('Fetching GitHub data for user:', username);
+      
+      // Add a debug log for the session
+      console.log('Current session:', JSON.stringify({
+        user: session?.user,
+        expires: session?.expires,
+        hasAccessToken: !!session?.accessToken
+      }));
+      
       const response = await fetch(`/api/github/user/${username}`);
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch GitHub data');
+        const errorText = await response.text();
+        console.error(`Error ${response.status}:`, errorText);
+        throw new Error(`Failed to fetch GitHub data: ${response.status} ${errorText}`);
       }
       
       const userData = await response.json();
+      console.log('GitHub user data received:', userData);
       
-      // We're mocking this data for demo purposes
-      // In a real app, we'd fetch real stats from the GitHub API
-      const mockData: GithubData = {
-        commits: Math.floor(Math.random() * 500) + 100,
-        stars: Math.floor(Math.random() * 200) + 50,
-        repos: userData.public_repos || Math.floor(Math.random() * 20) + 5,
-        followers: userData.followers || Math.floor(Math.random() * 100) + 10
-      };
-      
-      setGithubData(mockData);
+      // Use the stats returned from our API - these are actual values
+      if (userData.githubStats) {
+        setGithubData(userData.githubStats);
+      } else {
+        // Fallback to extracted values from the user data
+        setGithubData({
+          commits: 0, // We can't easily get this from basic user data
+          stars: 0, // Same for stars
+          repos: userData.public_repos || 0,
+          followers: userData.followers || 0
+        });
+      }
     } catch (err) {
       console.error('Error fetching GitHub data:', err);
-      setError('Failed to fetch your GitHub data. Please try again later.');
+      setError(`Failed to fetch your GitHub data: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      
+      // Provide fallback data even if the API request fails
+      setGithubData({
+        commits: 50,
+        stars: 20,
+        repos: 5,
+        followers: 10
+      });
     } finally {
       setLoading(false);
     }
@@ -117,11 +150,32 @@ export default function Dashboard() {
 
   return (
     <main className="flex min-h-screen flex-col items-center p-4 md:p-24 starry-bg">
-      <h1 className="text-3xl font-bold mb-10">Your Coding Horoscope</h1>
+      <div className="w-full flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Your Coding Horoscope</h1>
+        <button
+          onClick={handleSignOut}
+          disabled={isSigningOut}
+          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors disabled:opacity-50"
+        >
+          {isSigningOut ? 'Signing out...' : 'Sign Out'}
+        </button>
+      </div>
       
       {error ? (
-        <div className="bg-red-500 bg-opacity-20 border border-red-500 text-white p-4 rounded-md mb-6">
-          {error}
+        <div className="bg-red-500 bg-opacity-20 border border-red-500 text-white p-4 rounded-md mb-6 w-full max-w-3xl">
+          <p className="font-bold">Error:</p>
+          <p>{error}</p>
+          <div className="mt-2">
+            <button 
+              onClick={() => {
+                setError(null);
+                fetchGithubData();
+              }}
+              className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors mt-2"
+            >
+              Try Again
+            </button>
+          </div>
         </div>
       ) : null}
       
@@ -138,48 +192,70 @@ export default function Dashboard() {
             </div>
           )}
           <h2 className="text-xl font-semibold">{session.user.name}</h2>
+          {session.user.email && (
+            <p className="text-gray-400 mt-1">{session.user.email}</p>
+          )}
         </div>
       )}
 
-      {githubData && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 w-full max-w-3xl">
-          <div className="bg-black bg-opacity-50 p-4 rounded-lg border border-gray-700 text-center">
-            <h3 className="text-lg mb-1">Commits</h3>
-            <p className="text-2xl font-bold">{githubData.commits}</p>
-          </div>
-          <div className="bg-black bg-opacity-50 p-4 rounded-lg border border-gray-700 text-center">
-            <h3 className="text-lg mb-1">Stars</h3>
-            <p className="text-2xl font-bold">{githubData.stars}</p>
-          </div>
-          <div className="bg-black bg-opacity-50 p-4 rounded-lg border border-gray-700 text-center">
-            <h3 className="text-lg mb-1">Repos</h3>
-            <p className="text-2xl font-bold">{githubData.repos}</p>
-          </div>
-          <div className="bg-black bg-opacity-50 p-4 rounded-lg border border-gray-700 text-center">
-            <h3 className="text-lg mb-1">Followers</h3>
-            <p className="text-2xl font-bold">{githubData.followers}</p>
-          </div>
+      {loading ? (
+        <div className="text-center p-10">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-xl">Analyzing your GitHub data...</p>
         </div>
-      )}
-
-      {horoscope && (
+      ) : (
         <>
-          <HoroscopeCard 
-            horoscope={horoscope} 
-            username={session?.user?.name || 'Developer'} 
-          />
-          
-          <div className="text-center mt-4">
-            <button 
-              onClick={() => {
-                setLoading(true);
-                fetchGithubData();
-              }}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Refresh Horoscope
-            </button>
-          </div>
+          {githubData && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 w-full max-w-3xl">
+              <div className="bg-black bg-opacity-50 p-4 rounded-lg border border-gray-700 text-center">
+                <h3 className="text-lg mb-1">Commits</h3>
+                <p className="text-2xl font-bold">{githubData.commits}</p>
+              </div>
+              <div className="bg-black bg-opacity-50 p-4 rounded-lg border border-gray-700 text-center">
+                <h3 className="text-lg mb-1">Stars</h3>
+                <p className="text-2xl font-bold">{githubData.stars}</p>
+              </div>
+              <div className="bg-black bg-opacity-50 p-4 rounded-lg border border-gray-700 text-center">
+                <h3 className="text-lg mb-1">Repos</h3>
+                <p className="text-2xl font-bold">{githubData.repos}</p>
+              </div>
+              <div className="bg-black bg-opacity-50 p-4 rounded-lg border border-gray-700 text-center">
+                <h3 className="text-lg mb-1">Followers</h3>
+                <p className="text-2xl font-bold">{githubData.followers}</p>
+              </div>
+            </div>
+          )}
+
+          {horoscope ? (
+            <>
+              <HoroscopeCard 
+                horoscope={horoscope} 
+                username={session?.user?.name || 'Developer'} 
+              />
+              
+              <div className="text-center mt-4">
+                <button 
+                  onClick={() => {
+                    setLoading(true);
+                    fetchGithubData();
+                  }}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Refresh Horoscope
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center p-10">
+              <p className="text-xl mb-4">No horoscope generated yet</p>
+              <button 
+                onClick={generateHoroscope}
+                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Generate Horoscope
+              </button>
+            </div>
+          )}
         </>
       )}
     </main>

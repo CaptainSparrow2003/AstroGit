@@ -8,7 +8,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
       authorization: {
         params: {
-          scope: 'read:user user:email',
+          scope: 'read:user user:email public_repo repo',
         },
       },
     }),
@@ -18,17 +18,29 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt',
   },
   callbacks: {
-    async jwt({ token, account, profile }) {
+    async jwt({ token, account }) {
       if (account) {
         token.accessToken = account.access_token;
+        token.refreshToken = account.refresh_token;
+        token.accessTokenExpires = account.expires_at;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        // @ts-ignore
         session.accessToken = token.accessToken;
+        session.user.id = token.sub;
       }
+      
+      console.log('NextAuth Session:', {
+        hasAccessToken: !!session.accessToken,
+        user: session.user ? {
+          name: session.user.name,
+          email: session.user.email,
+          hasId: !!session.user.id
+        } : null
+      });
+      
       return session;
     },
   },

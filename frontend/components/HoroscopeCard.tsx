@@ -44,6 +44,14 @@ export default function HoroscopeCard({ horoscope, username = 'Developer' }: Hor
     );
   };
 
+  // Ensure traits are valid numbers between 1-10
+  const normalizedTraits = {
+    energy: Math.max(1, Math.min(10, traits.energy || 1)),
+    charisma: Math.max(1, Math.min(10, traits.charisma || 1)),
+    creativity: Math.max(1, Math.min(10, traits.creativity || 1)),
+    collaboration: Math.max(1, Math.min(10, traits.collaboration || 1))
+  };
+
   return (
     <div className="max-w-3xl w-full mx-auto my-6">
       <div className="bg-gradient-to-r from-blue-900 to-purple-900 p-8 rounded-lg shadow-xl border border-blue-500 relative overflow-hidden">
@@ -81,10 +89,10 @@ export default function HoroscopeCard({ horoscope, username = 'Developer' }: Hor
             <div className="relative h-4 bg-gray-700 rounded-full overflow-hidden">
               <div 
                 className="absolute top-0 left-0 h-full bg-yellow-500"
-                style={{ width: `${traits.energy * 10}%` }}
+                style={{ width: `${normalizedTraits.energy * 10}%` }}
               />
             </div>
-            <p className="text-center text-sm">{traits.energy}/10</p>
+            <p className="text-center text-sm">{normalizedTraits.energy}/10</p>
           </div>
           
           <div className="space-y-2">
@@ -92,10 +100,10 @@ export default function HoroscopeCard({ horoscope, username = 'Developer' }: Hor
             <div className="relative h-4 bg-gray-700 rounded-full overflow-hidden">
               <div 
                 className="absolute top-0 left-0 h-full bg-pink-500"
-                style={{ width: `${traits.charisma * 10}%` }}
+                style={{ width: `${normalizedTraits.charisma * 10}%` }}
               />
             </div>
-            <p className="text-center text-sm">{traits.charisma}/10</p>
+            <p className="text-center text-sm">{normalizedTraits.charisma}/10</p>
           </div>
           
           <div className="space-y-2">
@@ -103,10 +111,10 @@ export default function HoroscopeCard({ horoscope, username = 'Developer' }: Hor
             <div className="relative h-4 bg-gray-700 rounded-full overflow-hidden">
               <div 
                 className="absolute top-0 left-0 h-full bg-purple-500"
-                style={{ width: `${traits.creativity * 10}%` }}
+                style={{ width: `${normalizedTraits.creativity * 10}%` }}
               />
             </div>
-            <p className="text-center text-sm">{traits.creativity}/10</p>
+            <p className="text-center text-sm">{normalizedTraits.creativity}/10</p>
           </div>
           
           <div className="space-y-2">
@@ -114,10 +122,10 @@ export default function HoroscopeCard({ horoscope, username = 'Developer' }: Hor
             <div className="relative h-4 bg-gray-700 rounded-full overflow-hidden">
               <div 
                 className="absolute top-0 left-0 h-full bg-blue-500"
-                style={{ width: `${traits.collaboration * 10}%` }}
+                style={{ width: `${normalizedTraits.collaboration * 10}%` }}
               />
             </div>
-            <p className="text-center text-sm">{traits.collaboration}/10</p>
+            <p className="text-center text-sm">{normalizedTraits.collaboration}/10</p>
           </div>
         </div>
         

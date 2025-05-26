@@ -1,189 +1,93 @@
 #!/usr/bin/env node
 
-// Script to fix common NextAuth authentication issues
+/**
+ * Auth Configuration Fixer
+ * 
+ * This script automatically fixes common authentication issues:
+ * 1. Creates/updates .env.local with required variables
+ * 2. Generates a secure random NEXTAUTH_SECRET if missing
+ * 3. Sets NEXTAUTH_URL to the correct development URL
+ */
+
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const readline = require('readline');
-const https = require('https');
-const http = require('http');
+const dotenv = require('dotenv');
+const { execSync } = require('child_process');
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
+console.log('🔧 AstroGit Auth Configuration Fixer\n');
 
-// Generate a secure random string
-function generateSecret(length = 32) {
-  return crypto.randomBytes(length).toString('base64');
+// File paths
+const envPath = path.resolve(process.cwd(), '.env.local');
+
+// Generate secure random string for NEXTAUTH_SECRET
+function generateSecret() {
+  return crypto.randomBytes(32).toString('base64');
 }
 
-// Ask for user input with a default value
-function askQuestion(question, defaultValue) {
-  return new Promise((resolve) => {
-    const defaultText = defaultValue ? ` (default: ${defaultValue})` : '';
-    rl.question(`${question}${defaultText}: `, (answer) => {
-      resolve(answer || defaultValue || '');
-    });
-  });
+// Load existing env vars or create empty object
+let envVars = {};
+if (fs.existsSync(envPath)) {
+  console.log('📁 Found existing .env.local file');
+  envVars = dotenv.parse(fs.readFileSync(envPath));
+} else {
+  console.log('📁 Creating new .env.local file');
 }
 
-// Check if a URL is reachable
-function checkUrl(url) {
-  return new Promise((resolve) => {
-    const client = url.startsWith('https') ? https : http;
-    const req = client.get(url, (res) => {
-      resolve({
-        status: res.statusCode,
-        reachable: res.statusCode >= 200 && res.statusCode < 400
-      });
-    });
-    
-    req.on('error', () => {
-      resolve({ status: 'error', reachable: false });
-    });
-    
-    req.end();
-  });
+// Set NEXTAUTH_URL if missing or incorrect
+if (!envVars.NEXTAUTH_URL || !envVars.NEXTAUTH_URL.includes('localhost:3000')) {
+  envVars.NEXTAUTH_URL = 'http://localhost:3000';
+  console.log('✅ Set NEXTAUTH_URL to http://localhost:3000');
 }
 
-// Main function
-async function fixAuth() {
-  console.log('\n🔧 AstroGit Auth Troubleshooter 🔧\n');
-  console.log('This script will help fix common authentication issues.\n');
-  
-  const envPath = path.resolve(process.cwd(), '.env.local');
-  let existingEnv = {};
-  let envContent = '';
-  
-  // Step 1: Check if .env.local exists and load it
-  console.log('Step 1: Checking environment variables...');
-  if (fs.existsSync(envPath)) {
-    console.log('✅ Found .env.local file');
-    envContent = fs.readFileSync(envPath, 'utf8');
-    
-    // Parse existing values
-    envContent.split('\n').forEach(line => {
-      const matches = line.match(/^([^=:#]+?)[=:](.*)$/);
-      if (matches && matches.length > 2) {
-        const key = matches[1].trim();
-        let value = matches[2].trim();
-        
-        // Remove quotes if they exist
-        if ((value.startsWith('"') && value.endsWith('"')) || 
-            (value.startsWith("'") && value.endsWith("'"))) {
-          value = value.substring(1, value.length - 1);
-        }
-        
-        existingEnv[key] = value;
-      }
-    });
-  } else {
-    console.log('⚠️ No .env.local file found. Will create one.');
-  }
-  
-  // Step 2: Check NEXTAUTH_URL
-  console.log('\nStep 2: Checking NEXTAUTH_URL...');
-  const defaultUrl = existingEnv.NEXTAUTH_URL || 'http://localhost:3000';
-  const nextauthUrl = await askQuestion('Enter your NextAuth URL', defaultUrl);
-  
-  // Check if URL is reachable
-  console.log(`Checking if ${nextauthUrl} is reachable...`);
-  const urlCheck = await checkUrl(nextauthUrl);
-  if (urlCheck.reachable) {
-    console.log(`✅ URL is reachable (status: ${urlCheck.status})`);
-  } else {
-    console.log(`⚠️ URL is not reachable (status: ${urlCheck.status}). Make sure your server is running.`);
-  }
-  
-  // Step 3: Check NEXTAUTH_SECRET
-  console.log('\nStep 3: Checking NEXTAUTH_SECRET...');
-  let nextauthSecret = existingEnv.NEXTAUTH_SECRET;
-  if (!nextauthSecret || nextauthSecret === 'your_nextauth_secret') {
-    console.log('⚠️ NEXTAUTH_SECRET is missing or using a placeholder value');
-    const generateNew = await askQuestion('Generate a new secure secret? (y/n)', 'y');
-    if (generateNew.toLowerCase() === 'y' || generateNew.toLowerCase() === 'yes') {
-      nextauthSecret = generateSecret();
-      console.log('✅ Generated new NEXTAUTH_SECRET');
-    } else {
-      nextauthSecret = await askQuestion('Enter your NEXTAUTH_SECRET', '');
-      if (!nextauthSecret) {
-        console.log('⚠️ Warning: NEXTAUTH_SECRET is empty. Authentication may not work properly.');
-      }
-    }
-  } else {
-    console.log('✅ NEXTAUTH_SECRET is set');
-  }
-  
-  // Step 4: Check GitHub OAuth credentials
-  console.log('\nStep 4: Checking GitHub OAuth credentials...');
-  const githubClientId = await askQuestion('Enter your GitHub Client ID', existingEnv.GITHUB_CLIENT_ID || '');
-  const githubClientSecret = await askQuestion('Enter your GitHub Client Secret', existingEnv.GITHUB_CLIENT_SECRET || '');
-  
-  if (!githubClientId || !githubClientSecret) {
-    console.log('⚠️ Warning: GitHub credentials are missing. Authentication will not work.');
-  } else {
-    console.log('✅ GitHub credentials are set');
-  }
-  
-  // Step 5: Check API URL
-  console.log('\nStep 5: Checking API URL...');
-  const apiUrl = await askQuestion('Enter your API URL', existingEnv.NEXT_PUBLIC_API_URL || 'http://localhost:3001');
-  
-  // Check if API URL is reachable
-  console.log(`Checking if ${apiUrl} is reachable...`);
-  const apiCheck = await checkUrl(apiUrl);
-  if (apiCheck.reachable) {
-    console.log(`✅ API URL is reachable (status: ${apiCheck.status})`);
-  } else {
-    console.log(`⚠️ API URL is not reachable (status: ${apiCheck.status}). Make sure your API server is running.`);
-  }
-  
-  // Step 6: Create/update .env.local
-  console.log('\nStep 6: Updating .env.local file...');
-  const newEnv = {
-    NEXTAUTH_URL: nextauthUrl,
-    NEXTAUTH_SECRET: nextauthSecret,
-    GITHUB_CLIENT_ID: githubClientId,
-    GITHUB_CLIENT_SECRET: githubClientSecret,
-    NEXT_PUBLIC_API_URL: apiUrl,
-    NEXT_PUBLIC_SUPABASE_URL: existingEnv.NEXT_PUBLIC_SUPABASE_URL || '',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: existingEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  };
-  
-  let newEnvContent = '';
-  for (const [key, value] of Object.entries(newEnv)) {
-    if (value) {
-      newEnvContent += `${key}=${value}\n`;
-    }
-  }
-  
-  try {
-    fs.writeFileSync(envPath, newEnvContent);
-    console.log(`✅ Successfully updated ${envPath}`);
-  } catch (error) {
-    console.error(`❌ Error writing to ${envPath}: ${error.message}`);
-    console.log('\nHere is the content you should manually add to your .env.local file:');
-    console.log('\n' + newEnvContent);
-  }
-  
-  // Step 7: Check GitHub callback URL
-  console.log('\nStep 7: Verifying GitHub callback URL...');
-  const callbackUrl = `${nextauthUrl}/api/auth/callback/github`;
-  console.log(`\nMake sure your GitHub OAuth app has this exact callback URL configured:`);
-  console.log(`👉 ${callbackUrl}`);
-  
-  console.log('\n📋 Next steps:');
-  console.log('1. Restart your Next.js server: npm run dev');
-  console.log('2. Try signing in with GitHub again');
-  console.log('3. If issues persist, check the browser console and server logs for errors');
-  console.log('\nGood luck! 🚀\n');
-  
-  rl.close();
+// Generate NEXTAUTH_SECRET if missing
+if (!envVars.NEXTAUTH_SECRET) {
+  envVars.NEXTAUTH_SECRET = generateSecret();
+  console.log('✅ Generated new secure NEXTAUTH_SECRET');
 }
 
-// Run the script
-fixAuth().catch(error => {
-  console.error('Error:', error);
-  rl.close();
-}); 
+// Check GitHub credentials
+let needsGitHubCredentials = false;
+if (!envVars.GITHUB_CLIENT_ID || !envVars.GITHUB_CLIENT_SECRET) {
+  needsGitHubCredentials = true;
+  console.log('⚠️ GitHub OAuth credentials are missing');
+  
+  // Add placeholder values for now
+  if (!envVars.GITHUB_CLIENT_ID) {
+    envVars.GITHUB_CLIENT_ID = 'YOUR_GITHUB_CLIENT_ID';
+  }
+  
+  if (!envVars.GITHUB_CLIENT_SECRET) {
+    envVars.GITHUB_CLIENT_SECRET = 'YOUR_GITHUB_CLIENT_SECRET';
+  }
+}
+
+// Write the updated .env.local file
+const envContent = Object.entries(envVars)
+  .map(([key, value]) => `${key}=${value}`)
+  .join('\n');
+
+fs.writeFileSync(envPath, envContent);
+console.log('💾 Updated .env.local file with required variables');
+
+// Instructions for GitHub OAuth setup if needed
+if (needsGitHubCredentials) {
+  console.log('\n⭐ GitHub OAuth Setup Instructions:');
+  console.log('1. Go to https://github.com/settings/developers');
+  console.log('2. Click "New OAuth App" or select an existing app');
+  console.log('3. Set the following values:');
+  console.log('   - Application name: AstroGit (or any name you prefer)');
+  console.log('   - Homepage URL: http://localhost:3000');
+  console.log('   - Authorization callback URL: http://localhost:3000/api/auth/callback/github');
+  console.log('4. Click "Register application"');
+  console.log('5. Copy the Client ID and Client Secret');
+  console.log('6. Update your .env.local file with these values');
+}
+
+// Final instructions
+console.log('\n🚀 Next steps:');
+console.log('1. Restart your Next.js development server');
+if (needsGitHubCredentials) {
+  console.log('2. Complete the GitHub OAuth setup above');
+}
+console.log('\n✨ Auth configuration fix complete!'); 
