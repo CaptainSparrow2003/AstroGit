@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { createClient } = require('@supabase/supabase-js');
 const { Octokit } = require('octokit');
 
 // Initialize Express app
@@ -11,11 +10,6 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-// Supabase client
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Routes
 app.get('/', (req, res) => {
@@ -97,24 +91,14 @@ app.post('/api/horoscope', async (req, res) => {
   try {
     const { userId, githubData } = req.body;
     
-    if (!userId || !githubData) {
+    if (!githubData) {
       return res.status(400).json({ error: 'Missing required data' });
     }
     
     const horoscope = generateHoroscope(githubData);
     
-    // Store horoscope in Supabase
-    const { data, error } = await supabase
-      .from('horoscopes')
-      .insert([{
-        user_id: userId,
-        date: horoscope.date,
-        content: horoscope.message,
-        traits: horoscope.traits
-      }])
-      .select();
-      
-    if (error) throw error;
+    // Log the generated horoscope for the user (no DB storage)
+    console.log(`Generated horoscope for user: ${userId || 'anonymous'}`);
     
     res.json(horoscope);
   } catch (error) {

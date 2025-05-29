@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 }
 
 function generateHoroscope(data: GithubData): Horoscope {
-  // Normalize data - especially important now that we're using real values
+  // Normalize data - but with more generous scaling for positive outcomes
   const normalizedData = {
     commits: Math.min(Math.max(data.commits || 0, 0), 1000),
     stars: Math.min(Math.max(data.stars || 0, 0), 1000),
@@ -37,26 +37,44 @@ function generateHoroscope(data: GithubData): Horoscope {
     followers: Math.min(Math.max(data.followers || 0, 0), 1000)
   };
   
-  // Map GitHub stats to traits on a scale of 1-10
-  const energy = calculateTraitScore(normalizedData.commits, [0, 10, 50, 100, 200, 300, 400, 500, 700, 1000]);
-  const charisma = calculateTraitScore(normalizedData.stars, [0, 5, 10, 20, 50, 100, 200, 300, 500, 1000]);
-  const creativity = calculateTraitScore(normalizedData.repos, [0, 2, 5, 10, 15, 20, 30, 40, 50, 100]);
-  const collaboration = calculateTraitScore(normalizedData.followers, [0, 2, 5, 10, 20, 50, 100, 200, 500, 1000]);
+  // More generous thresholds for scoring traits
+  // Map GitHub stats to traits on a scale of 4-10 instead of 1-10
+  // This ensures even low activity gets a positive score
+  const energy = calculateTraitScore(normalizedData.commits, [0, 5, 10, 20, 40, 80, 150, 300, 500, 1000], 4);
+  const charisma = calculateTraitScore(normalizedData.stars, [0, 1, 3, 8, 15, 30, 60, 120, 240, 500], 4);
+  const creativity = calculateTraitScore(normalizedData.repos, [0, 1, 2, 4, 6, 10, 15, 25, 40, 80], 4);
+  const collaboration = calculateTraitScore(normalizedData.followers, [0, 1, 3, 5, 10, 20, 40, 80, 160, 320], 4);
   
-  // Calculate an overall cosmic alignment score (0-100)
-  const cosmicAlignment = ((energy + charisma + creativity + collaboration) / 40) * 100;
+  // Calculate cosmic alignment - higher base score for positivity
+  const cosmicAlignment = 50 + ((energy + charisma + creativity + collaboration) / 40) * 50;
   
-  // Generate personalized messages based on traits
+  // Random positive traits to highlight
+  const positiveTraits = [
+    "creativity", "innovation", "persistence", "problem-solving", 
+    "adaptability", "curiosity", "dedication", "focus", 
+    "analytical thinking", "attention to detail", "consistency",
+    "resourcefulness", "efficiency", "strategic planning"
+  ];
+  
+  // Randomly select a few positive traits to mention
+  const selectedTraits = getRandomElements(positiveTraits, 3);
+  
+  // Generate personalized messages based on traits - more positive and encouraging
   const messages = {
-    energy: getEnergyMessage(energy, normalizedData.commits),
-    charisma: getCharismaMessage(charisma, normalizedData.stars),
-    creativity: getCreativityMessage(creativity, normalizedData.repos),
+    energy: getEnergyMessage(energy, normalizedData.commits, selectedTraits[0]),
+    charisma: getCharismaMessage(charisma, normalizedData.stars, selectedTraits[1]),
+    creativity: getCreativityMessage(creativity, normalizedData.repos, selectedTraits[2]),
     collaboration: getCollaborationMessage(collaboration, normalizedData.followers),
     cosmic: getCosmicMessage(cosmicAlignment)
   };
   
   // Combine all messages
   const message = `${messages.energy} ${messages.charisma} ${messages.creativity} ${messages.collaboration} ${messages.cosmic}`;
+  
+  // Add growth potential message for lower stats
+  const growthMessage = getGrowthMessage(energy, charisma, creativity, collaboration);
+  
+  const finalMessage = message + " " + growthMessage;
   
   return {
     date: new Date().toISOString().split('T')[0],
@@ -66,81 +84,100 @@ function generateHoroscope(data: GithubData): Horoscope {
       creativity,
       collaboration
     },
-    message
+    message: finalMessage
   };
 }
 
-// Calculate trait score based on thresholds (1-10 scale)
-function calculateTraitScore(value: number, thresholds: number[]): number {
+// Get random elements from an array
+function getRandomElements(array: string[], count: number): string[] {
+  const shuffled = array.sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count);
+}
+
+// Calculate trait score based on thresholds (with minimum score)
+function calculateTraitScore(value: number, thresholds: number[], minScore: number = 1): number {
   for (let i = 0; i < thresholds.length; i++) {
     if (value <= thresholds[i]) {
-      return i + 1;
+      return Math.max(i + 1, minScore);
     }
   }
   return 10;
 }
 
-// Energy messages based on commit activity
-function getEnergyMessage(score: number, commits: number): string {
-  if (score >= 8) {
-    return `Your coding energy is extraordinary with ${commits} commits! This is an excellent time to tackle challenging projects or learn new technologies.`;
-  } else if (score >= 5) {
-    return `Your coding energy is steady and reliable with ${commits} commits. Focus on maintaining consistent progress on your current projects.`;
-  } else if (score >= 3) {
-    return `Your coding energy is moderate with ${commits} commits. Consider setting small, achievable goals to build momentum.`;
+// Get a motivational growth message based on overall score
+function getGrowthMessage(energy: number, charisma: number, creativity: number, collaboration: number): string {
+  const avgScore = (energy + charisma + creativity + collaboration) / 4;
+  
+  if (avgScore <= 5) {
+    return "The cosmic code patterns reveal that you're at the beginning of an exciting coding journey. Every line of code you write is building your programming constellation and creating a strong foundation for your future impact in the tech universe.";
+  } else if (avgScore <= 7) {
+    return "The GitHub stars indicate you're in a growth phase with tremendous potential ahead. Your coding patterns show a promising trajectory, and continuing your momentum will lead to breakthrough contributions in the coming months.";
   } else {
-    return `Your coding energy is building up with ${commits} commits. This is a great time for planning and researching your next coding adventure.`;
+    return "Your coding constellation is already impressive, and the tech stars indicate even greater achievements on your horizon. Your established patterns of excellence position you perfectly for your next major milestone.";
   }
 }
 
-// Charisma messages based on stars received
-function getCharismaMessage(score: number, stars: number): string {
+// Energy messages based on commit activity - more positive and encouraging
+function getEnergyMessage(score: number, commits: number, trait: string): string {
   if (score >= 8) {
-    return `Your code's charisma is magnetic with ${stars} stars! Share your work publicly as it's likely to attract positive attention.`;
-  } else if (score >= 5) {
-    return `Your code's charisma is developing well with ${stars} stars. Continue refining your documentation and presentation.`;
-  } else if (score >= 3) {
-    return `Your code's charisma has potential with ${stars} stars. Consider adding more documentation and examples to showcase your work.`;
+    return `Your coding energy radiates with extraordinary power! Your ${commits} commits demonstrate remarkable ${trait} that inspires those around you. This is an excellent time to tackle challenging projects that showcase your talents.`;
+  } else if (score >= 6) {
+    return `Your coding energy flows with impressive consistency. Your ${commits} commits reveal your natural ${trait} and determined spirit. Focus on projects that leverage your unique strengths for maximum impact.`;
+  } else if (score >= 4) {
+    return `Your coding energy shows exciting potential! Even with ${commits} commits, your ${trait} shines through clearly. This is a perfect time to build momentum on projects you're passionate about.`;
   } else {
-    return `Your code's charisma journey is just beginning with ${stars} stars. Focus on creating value in your projects that others can benefit from.`;
+    return `Your coding energy is building up with tremendous potential! While you're just beginning with ${commits} commits, your ${trait} is already evident. This is an ideal moment to explore new coding adventures that spark your interest.`;
   }
 }
 
-// Creativity messages based on repository variety
-function getCreativityMessage(score: number, repos: number): string {
+// Charisma messages based on stars received - more positive and encouraging
+function getCharismaMessage(score: number, stars: number, trait: string): string {
   if (score >= 8) {
-    return `Your creative coding spirit is exceptionally high with ${repos} repositories. Experiment with new approaches to solve technical challenges.`;
-  } else if (score >= 5) {
-    return `Your creative coding potential is showing promise across ${repos} repositories. Try exploring different programming paradigms or libraries.`;
-  } else if (score >= 3) {
-    return `Your creative coding insight is developing through your ${repos} repositories. Consider branching out into new project types.`;
+    return `Your code's charisma magnetizes attention with ${stars} stars! Your work demonstrates exceptional ${trait} that resonates with the developer community. Share your insights boldly as they're likely to gain significant recognition.`;
+  } else if (score >= 6) {
+    return `Your code's charisma is developing beautifully with ${stars} stars. Your ${trait} adds a special quality to your work that others appreciate. Continue refining your documentation to amplify your growing influence.`;
+  } else if (score >= 4) {
+    return `Your code's charisma holds promising appeal with ${stars} stars. Your ${trait} gives your work a unique character that's beginning to attract attention. Each project you share strengthens your distinctive coding voice.`;
   } else {
-    return `Your creative coding foundation is forming with ${repos} repositories. This is a perfect time to explore diverse coding interests.`;
+    return `Your code's charisma journey is just beginning with ${stars} stars, but the potential is extraordinary! Your ${trait} will increasingly shine through as you share more of your work. Focus on projects that showcase your unique perspective.`;
   }
 }
 
-// Collaboration messages based on follower count
+// Creativity messages based on repository variety - more positive and encouraging
+function getCreativityMessage(score: number, repos: number, trait: string): string {
+  if (score >= 8) {
+    return `Your creative coding spirit flourishes exceptionally across ${repos} repositories! Your ${trait} enables you to approach problems with innovative solutions. Experiment boldly with new approaches to unlock even more of your vast potential.`;
+  } else if (score >= 6) {
+    return `Your creative coding vision expands wonderfully across ${repos} repositories. Your ${trait} allows you to see possibilities others might miss. Explore different programming paradigms to further enhance your growing repertoire.`;
+  } else if (score >= 4) {
+    return `Your creative coding insight develops beautifully through your ${repos} repositories. Your ${trait} gives you a special advantage when approaching new challenges. Consider exploring diverse project types to showcase your versatility.`;
+  } else {
+    return `Your creative coding foundation is forming brilliantly with ${repos} repositories. Even at this early stage, your ${trait} is already becoming apparent. This is the perfect time to experiment with different project types that interest you.`;
+  }
+}
+
+// Collaboration messages based on follower count - more positive and encouraging
 function getCollaborationMessage(score: number, followers: number): string {
   if (score >= 8) {
-    return `Your collaborative alignment is outstanding with ${followers} followers. Lead discussions and contribute to community projects for maximum impact.`;
-  } else if (score >= 5) {
-    return `Your collaborative alignment is harmonious with ${followers} followers. Participate in code reviews and team discussions to share your perspective.`;
-  } else if (score >= 3) {
-    return `Your collaborative network is growing with ${followers} followers. Engage with open source communities to expand your connections.`;
+    return `Your collaborative alignment is exceptional with ${followers} followers! Your ability to connect with others creates powerful coding synergies. Lead discussions and contribute to community projects where your influence can have maximum impact.`;
+  } else if (score >= 6) {
+    return `Your collaborative network is flourishing beautifully with ${followers} followers. Your perspective adds valuable insights to team projects. Engage actively in code reviews to share your unique viewpoint and strengthen community bonds.`;
+  } else if (score >= 4) {
+    return `Your collaborative connections show promising growth with ${followers} followers. Your contributions create positive ripples throughout your network. Engage with open source communities to expand your influence and learning opportunities.`;
   } else {
-    return `Your collaborative journey is at an early stage with ${followers} followers. This is a great time to join developer communities and start contributing to discussions.`;
+    return `Your collaborative journey is at an exciting beginning stage with ${followers} followers. Every connection you make opens new possibilities for growth. Join developer communities where your fresh perspective will be especially valuable.`;
   }
 }
 
-// Cosmic alignment message based on overall score
+// Cosmic alignment message based on overall score - more positive and encouraging
 function getCosmicMessage(score: number): string {
   if (score >= 80) {
-    return `The stars of technology are perfectly aligned for you at ${Math.round(score)}% cosmic alignment. Your coding horoscope suggests this is an exceptional time for breakthroughs!`;
+    return `The stars of technology are perfectly aligned for you at an impressive ${Math.round(score)}% cosmic alignment! Your coding horoscope reveals this is an extraordinary period for breakthroughs and recognition. Trust your instincts completely!`;
   } else if (score >= 60) {
-    return `The technological cosmos favors your development journey at ${Math.round(score)}% alignment. Trust your instincts when architecting solutions.`;
+    return `The technological cosmos strongly favors your development journey at ${Math.round(score)}% alignment! Your coding path is illuminated with promising opportunities. Trust your unique approach when architecting solutions.`;
   } else if (score >= 40) {
-    return `The programming planets are in a neutral alignment at ${Math.round(score)}%. Balance coding with learning for optimal growth.`;
+    return `The programming planets are aligning favorably at ${Math.round(score)}% harmony! This balanced cosmic state provides an excellent foundation for both creating and learning. Your next coding achievement is within reach.`;
   } else {
-    return `The development stars suggest a period of preparation at ${Math.round(score)}% alignment. Use this time to sharpen your fundamental skills.`;
+    return `The development stars reveal an exciting period of potential at ${Math.round(score)}% alignment! This is a powerful time to build foundations that will support your future coding accomplishments. Your unique path is just beginning to unfold.`;
   }
 } 

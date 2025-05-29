@@ -1,168 +1,141 @@
-# AstroGit
+# ✨ AstroGit - Your Coding Horoscope
 
-AstroGit is a web application that generates your coding horoscope based on your GitHub activity. It analyzes metrics like commits (energy), stars (popularity), repositories (creativity), and followers (collaboration) to provide personalized coding insights.
+<div align="center">
 
-## Project Structure
+![AstroGit Banner](https://i.imgur.com/JZ3zXyD.png)
 
-This project follows a clear separation between frontend and backend:
+[![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-- **Frontend**: Next.js application with TailwindCSS for styling
-- **Backend**: Express.js API server with Supabase for data storage
-- **Database**: SQL schema files for Supabase setup
+🌟 **Discover your coding destiny based on your GitHub activity** 🌟
 
-## Prerequisites
+[Features](#-features) • [Demo](#-live-demo) • [Installation](#-installation) • [Usage](#-usage) • [Contributing](#-contributing)
+
+</div>
+
+## 🚀 Introduction
+
+AstroGit generates your personalized coding horoscope by analyzing your GitHub profile. Simply enter your GitHub username, and the cosmic algorithm will reveal insights about your coding style based on:
+
+- **Energy** 🔋 - Derived from your commit frequency
+- **Charisma** ✨ - Based on stars your repositories have received
+- **Creativity** 🎨 - Measured by the variety of repositories you maintain
+- **Collaboration** 👥 - Reflected in your follower count and network
+
+No authentication required - just pure cosmic coding insights!
+
+![AstroGit Screenshot](https://i.imgur.com/fTVQxDs.png)
+
+## ✨ Features
+
+- 🔮 **Personalized Horoscopes** - Unique insights based on your GitHub activity
+- 📊 **Beautiful Visualizations** - See your cosmic coding traits with stunning graphics
+- 🚫 **No Authentication** - Just enter a GitHub username and get started
+- 📱 **Responsive Design** - Works perfectly on desktop and mobile devices
+- 🌐 **Social Sharing** - Share your coding destiny with friends and colleagues
+- 💫 **Cosmic UI** - Immersive starry interface that brings your horoscope to life
+
+## 🌐 Live Demo
+
+Experience AstroGit in action: [https://astrogit.vercel.app](https://astrogit.vercel.app)
+
+## 📋 Prerequisites
 
 - Node.js (v16 or later)
 - npm or yarn
-- A GitHub account
-- A Supabase account
+- A GitHub account (for testing with your own profile)
 
-## Setup Instructions
+## 🛠️ Installation
 
-### 1. GitHub OAuth Application
+### 1. Clone the repository
 
-1. Go to your GitHub account settings > Developer settings > OAuth Apps
-2. Create a new OAuth application:
-   - Application name: AstroGit
-   - Homepage URL: http://localhost:3000
-   - Authorization callback URL: http://localhost:3000/api/auth/callback/github
-3. Once created, generate a new client secret and note both the Client ID and Client Secret
+```bash
+git clone https://github.com/yourusername/AstroGit.git
+cd AstroGit
+```
 
-### 2. Supabase Setup
+### 2. Frontend Setup
 
-1. Create a new project at [supabase.com](https://supabase.com)
-2. Navigate to the SQL Editor in the Supabase dashboard
-3. Copy the contents of `supabase/schema.sql` and paste it into a new SQL query
-4. Execute the query to create all the necessary tables:
-   - `users` (id, github_id, name, email)
-   - `github_data` (user_id, stars, commits, repos, followers)
-   - `horoscopes` (user_id, date, content, traits)
-5. Copy your Supabase URL and anon/public key from the API settings page
+```bash
+cd frontend
+npm install
+```
 
-For more details on the database schema and setup, check the [Supabase README](./supabase/README.md).
+Create a `.env.local` file based on `.env.example`:
+
+```
+NEXT_PUBLIC_API_URL=http://localhost:3001
+```
+
+Start the development server:
+
+```bash
+npm run dev
+```
 
 ### 3. Backend Setup
 
-1. Navigate to the backend directory:
-   ```
-   cd backend
-   ```
+```bash
+cd ../backend
+npm install
+```
 
-2. Install dependencies:
-   ```
-   npm install
-   ```
+Create a `.env` file based on `.env.example`:
 
-3. Create a `.env` file based on `.env.example`:
-   ```
-   PORT=3001
-   SUPABASE_URL=your_supabase_url
-   SUPABASE_ANON_KEY=your_supabase_anon_key
-   GITHUB_CLIENT_ID=your_github_client_id
-   GITHUB_CLIENT_SECRET=your_github_client_secret
-   ```
+```
+PORT=3001
+```
 
-4. Start the development server:
-   ```
-   npm run dev
-   ```
+Start the backend server:
 
-### 4. Frontend Setup
+```bash
+npm run dev
+```
 
-1. Navigate to the frontend directory:
-   ```
-   cd frontend
-   ```
+Now you can access the application at http://localhost:3000 🎉
 
-2. Install dependencies:
-   ```
-   npm install
-   ```
+## 🔍 Usage
 
-3. Create a `.env.local` file based on `.env.example`:
-   ```
-   NEXTAUTH_URL=http://localhost:3000
-   NEXTAUTH_SECRET=your_nextauth_secret  # Generate a secure random string
-   GITHUB_CLIENT_ID=your_github_client_id
-   GITHUB_CLIENT_SECRET=your_github_client_secret
-   NEXT_PUBLIC_API_URL=http://localhost:3001
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
+1. **Enter a GitHub Username** - Type any valid GitHub username in the input field
+2. **View Your Horoscope** - See your coding traits and personalized message
+3. **Share Your Results** - Copy your horoscope or share it directly on Twitter
+4. **Explore Your Traits** - Switch between tabs to see detailed insights about your coding style
 
-   To generate a secure NEXTAUTH_SECRET, you can use:
-   ```
-   openssl rand -base64 32
-   ```
+## ⚠️ Troubleshooting
 
-4. Verify your auth configuration:
-   ```
-   npm run check-auth
-   ```
+### GitHub API Access Issues
 
-5. Start the development server:
-   ```
-   npm run dev
-   ```
+1. **Rate Limiting**
+   - The GitHub API has rate limits for unauthenticated requests
+   - If you hit limits, wait an hour or consider implementing a token-based approach
 
-6. Access the application at http://localhost:3000
+2. **User Not Found**
+   - Ensure the GitHub username exists
+   - Check for typos in the username
 
-## Troubleshooting GitHub Authentication
+3. **API Changes**
+   - If the GitHub API changes, the application might need updates
+   - Check the GitHub API documentation for recent changes
 
-If you're having trouble with GitHub authentication, follow these steps:
+## 🤝 Contributing
 
-### Common Issues and Solutions
+Contributions are welcome! Feel free to:
 
-1. **404 Error on /api/auth/error or other auth pages**:
-   - Make sure your `.env.local` file has all the required variables
-   - Check that NEXTAUTH_URL is set to the correct URL (e.g., http://localhost:3000)
-   - Restart your Next.js server after updating environment variables
+- Report bugs
+- Suggest features
+- Submit pull requests
 
-2. **GitHub OAuth Authorization Error**:
-   - Verify that your GitHub OAuth app has the correct callback URL: `http://localhost:3000/api/auth/callback/github`
-   - Make sure your GitHub client ID and secret are correctly copied to your `.env.local` file
-   - Check if your GitHub OAuth app is still in "pending approval" state
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
-3. **Configuration Error**:
-   - Run the auth check script to identify configuration issues:
-     ```
-     npm run check-auth
-     ```
-   - Visit `/api/auth/debug` in your browser to see detailed diagnostic information
+## 📝 License
 
-4. **"Sign in with GitHub" button not working**:
-   - Open your browser's developer console to look for error messages
-   - Check your network tab for failed requests to GitHub's OAuth endpoints
-   - Verify that all the required Next.js API routes for auth are set up correctly
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### Testing GitHub Authentication
+---
 
-1. Open your browser in an incognito/private window
-2. Go to http://localhost:3000
-3. Click "Sign in with GitHub"
-4. If you're redirected to GitHub and then back to your app successfully, authentication is working
-5. If you encounter errors, check the troubleshooting steps above
-
-## Features
-
-- GitHub OAuth authentication
-- Fetches user's GitHub stats
-- Generates personalized coding horoscopes
-- Beautiful cosmic UI with trait visualizations
-- Responsive design works on mobile and desktop
-- Secure data storage with Supabase and Row Level Security
-- Social sharing capabilities
-
-## Database Schema
-
-The application uses three main tables in Supabase:
-
-1. **users** - Stores user profile information from GitHub
-2. **github_data** - Stores GitHub statistics (commits, stars, repos, followers)
-3. **horoscopes** - Stores generated horoscopes and trait scores
-
-All tables have Row Level Security enabled to ensure data privacy.
-
-## License
-
-MIT
+<div align="center">
+  <p>Made with ❤️ and cosmic coding energy</p>
+  <p>© 2024 AstroGit</p>
+</div>
