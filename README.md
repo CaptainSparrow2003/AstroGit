@@ -137,5 +137,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
   <p>Made with ❤️ and cosmic coding energy</p>
-  <p>© 2024 AstroGit</p>
+  <p>© 2025 AstroGit</p>
 </div>
