@@ -1,51 +1,46 @@
 'use client';
 
-import { useSession, signIn } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 export default function Home() {
-  const { data: session, status } = useSession();
   const router = useRouter();
-  const [isSigningIn, setIsSigningIn] = useState(false);
-  const [signInError, setSignInError] = useState<string | null>(null);
+  const [username, setUsername] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-  useEffect(() => {
-    if (status === 'authenticated') {
-      router.push('/dashboard');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!username.trim()) {
+      setError('Please enter a GitHub username');
+      return;
     }
-  }, [status, router]);
-
-  const handleSignIn = async () => {
+    
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      setIsSigningIn(true);
-      setSignInError(null);
+      // Check if username exists before redirecting
+      const response = await fetch(`/api/github/user/${username}`);
       
-      console.log('Starting GitHub sign-in process...');
-      
-      // Verify that we're in a browser environment before checking window.location
-      const currentUrl = typeof window !== 'undefined' ? window.location.origin : '';
-      console.log('Current URL:', currentUrl);
-      
-      // Attempt to sign in with GitHub
-      const result = await signIn('github', { 
-        callbackUrl: '/dashboard',
-        redirect: true
-      });
-      
-      // This code will only run if redirect is set to false
-      if (result?.error) {
-        console.error('Sign-in error:', result.error);
-        setSignInError(`Authentication failed: ${result.error}`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error(`GitHub user '${username}' not found`);
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Error: ${response.status}`);
+        }
       }
       
+      // Username exists, redirect to dashboard with the username
+      router.push(`/dashboard?username=${encodeURIComponent(username)}`);
     } catch (error) {
-      console.error('Sign-in error:', error);
-      setSignInError(error instanceof Error ? error.message : 'Unknown error occurred');
-    } finally {
-      setIsSigningIn(false);
+      console.error('Error checking username:', error);
+      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+      setIsLoading(false);
     }
   };
 
@@ -55,17 +50,6 @@ export default function Home() {
         <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit">
           <code className="font-mono font-bold">AstroGit - Your Coding Horoscope</code>
         </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          {status === 'authenticated' ? (
-            <Link href="/dashboard" className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0">
-              Go to Dashboard
-            </Link>
-          ) : (
-            <span className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0">
-              Sign in to continue
-            </span>
-          )}
-        </div>
       </div>
 
       <div className="relative flex place-items-center flex-col before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] text-center">
@@ -91,38 +75,35 @@ export default function Home() {
           </div>
         </div>
         
-        {signInError && (
+        {error && (
           <div className="bg-red-500 bg-opacity-20 border border-red-500 text-white p-4 rounded-md mb-6 max-w-md">
-            <p className="font-bold">Sign-in Error:</p>
-            <p>{signInError}</p>
-            <p className="mt-2 text-sm">
-              <Link href="/auth/debug" className="underline hover:text-blue-300">
-                View auth debug information
-              </Link>
-            </p>
+            <p className="font-bold">Error:</p>
+            <p>{error}</p>
           </div>
         )}
         
-        <button
-          onClick={handleSignIn}
-          disabled={isSigningIn}
-          className={`px-8 py-3 border border-blue-600 bg-gradient-to-r from-blue-600 to-purple-600 rounded-md font-semibold text-white transition-all duration-200 ease-in-out ${
-            isSigningIn 
-              ? 'opacity-70 cursor-not-allowed' 
-              : 'hover:from-blue-700 hover:to-purple-700'
-          }`}
-        >
-          {isSigningIn ? 'Signing in...' : 'Sign in with GitHub'}
-        </button>
-        
-        <div className="mt-4 text-sm text-gray-400 flex flex-col items-center space-y-2">
-          <Link href="/auth/debug" className="underline hover:text-blue-400">
-            Debug Authentication
-          </Link>
-          <Link href="/auth/github" className="text-green-400 hover:text-green-300 font-medium">
-            Try Direct GitHub Auth Page
-          </Link>
-        </div>
+        <form onSubmit={handleSubmit} className="w-full max-w-md mb-8">
+          <div className="flex flex-col md:flex-row gap-2">
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter GitHub username"
+              className="flex-grow px-4 py-3 rounded-md border border-gray-600 bg-black bg-opacity-50 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={`px-8 py-3 border border-blue-600 bg-gradient-to-r from-blue-600 to-purple-600 rounded-md font-semibold text-white transition-all duration-200 ease-in-out ${
+                isLoading 
+                  ? 'opacity-70 cursor-not-allowed' 
+                  : 'hover:from-blue-700 hover:to-purple-700'
+              }`}
+            >
+              {isLoading ? 'Loading...' : 'Get Horoscope'}
+            </button>
+          </div>
+        </form>
       </div>
 
       <div className="mb-32 grid text-center lg:mb-0 lg:grid-cols-3 lg:text-left">
@@ -139,7 +120,7 @@ export default function Home() {
             </span>
           </h2>
           <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Connect your GitHub account to generate your coding horoscope.
+            Enter your GitHub username to generate your coding horoscope.
           </p>
         </a>
 

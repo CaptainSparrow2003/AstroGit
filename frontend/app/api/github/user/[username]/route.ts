@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/utils/auth';
 import { GithubData } from '@/types/horoscope';
 
 export async function GET(
@@ -11,29 +9,11 @@ export async function GET(
     // Get the username from URL params
     const username = params.username;
     
-    // Get the current session to access GitHub token
-    const session = await getServerSession(authOptions);
-    
-    // Log session info for debugging
-    console.log('GitHub API Session:', {
-      hasSession: !!session,
-      hasAccessToken: !!(session?.accessToken),
-      username: username
-    });
-    
-    // Create base headers
-    let headers = {
+    // Create headers for GitHub API
+    const headers = {
       'Accept': 'application/vnd.github.v3+json',
       'User-Agent': 'AstroGit-App'
     };
-    
-    // Add authorization header if we have an access token
-    if (session?.accessToken) {
-      console.log('Using access token from session for GitHub API');
-      headers['Authorization'] = `token ${session.accessToken}`;
-    } else {
-      console.log('No access token available, making unauthenticated request to GitHub API');
-    }
     
     // Fetch basic user data
     console.log(`Fetching GitHub user data for: ${username}`);
@@ -42,14 +22,6 @@ export async function GET(
     if (!userResponse.ok) {
       const errorText = await userResponse.text();
       console.error(`GitHub API error (${userResponse.status}):`, errorText);
-      
-      // If unauthorized, the token might be invalid
-      if (userResponse.status === 401) {
-        return NextResponse.json(
-          { error: 'GitHub API authorization failed. Please sign out and sign in again.' },
-          { status: 401 }
-        );
-      }
       
       // If not found, the username might be incorrect
       if (userResponse.status === 404) {
@@ -69,6 +41,10 @@ export async function GET(
     const userData = await userResponse.json();
     console.log(`Successfully fetched data for user: ${userData.login}`);
     
+    // Get events to calculate more accurate commit count
+    console.log(`Fetching events for user: ${username}`);
+    const eventsResponse = await fetch(`https://api.github.com/users/${username}/events?per_page=100`, { headers });
+    
     // Initialize GitHub data with values from user data
     const githubData: GithubData = {
       commits: 0,
@@ -77,9 +53,43 @@ export async function GET(
       followers: userData.followers || 0
     };
     
-    // Fetch repositories to calculate stars
+    // Get additional data to enrich profile
+    const additionalData = {
+      following: userData.following || 0,
+      created_at: userData.created_at,
+      location: userData.location || null,
+      company: userData.company || null,
+      blog: userData.blog || null,
+      bio: userData.bio || null,
+      twitter_username: userData.twitter_username || null,
+      public_gists: userData.public_gists || 0,
+      account_age_days: Math.floor((new Date().getTime() - new Date(userData.created_at).getTime()) / (1000 * 60 * 60 * 24))
+    };
+    
+    // Count commits from events if available
+    if (eventsResponse.ok) {
+      const events = await eventsResponse.json();
+      
+      // Count push events and their commits
+      let recentCommitCount = 0;
+      
+      events.forEach((event: any) => {
+        if (event.type === 'PushEvent' && event.payload && event.payload.commits) {
+          recentCommitCount += event.payload.commits.length;
+        }
+      });
+      
+      console.log(`Found ${recentCommitCount} recent commits from events`);
+      
+      // Use recent commits as a base, but we'll still fetch repos for stars and to estimate total commits better
+      githubData.commits = recentCommitCount;
+    }
+    
+    // Fetch repositories to calculate stars and languages
     console.log(`Fetching repositories for user: ${username}`);
     const reposResponse = await fetch(`https://api.github.com/users/${username}/repos?per_page=100`, { headers });
+    
+    const languageStats: Record<string, number> = {};
     
     if (reposResponse.ok) {
       const repos = await reposResponse.json();
@@ -88,14 +98,38 @@ export async function GET(
       // Calculate total stars
       githubData.stars = repos.reduce((total: number, repo: any) => total + (repo.stargazers_count || 0), 0);
       
-      // For commits, we'll need to check each repository
-      // To avoid rate limiting, we'll check only the first 5 repos
-      if (repos.length > 0) {
-        console.log(`Fetching commit data from ${Math.min(repos.length, 5)} repositories`);
-        
-        // Fetch commit counts for each repository (limited to first 5 repos to avoid rate limiting)
+      // Collect language data
+      const languagePromises = repos.slice(0, 10).map(async (repo: any) => {
+        if (repo.language) {
+          // If the repo already has a language field, use it
+          languageStats[repo.language] = (languageStats[repo.language] || 0) + 1;
+        } else if (repo.languages_url) {
+          // Otherwise try to fetch languages
+          try {
+            const langResponse = await fetch(repo.languages_url, { headers });
+            if (langResponse.ok) {
+              const languages = await langResponse.json();
+              Object.keys(languages).forEach(lang => {
+                languageStats[lang] = (languageStats[lang] || 0) + 1;
+              });
+            }
+          } catch (error) {
+            console.error(`Error fetching languages for ${repo.name}:`, error);
+          }
+        }
+      });
+      
+      try {
+        await Promise.all(languagePromises);
+      } catch (error) {
+        console.error('Error processing languages:', error);
+      }
+      
+      // If event-based commit count is too low, estimate using repositories
+      if (githubData.commits < 10 && repos.length > 0) {
+        // For commits, we'll check a sample of repositories
         const reposToCheck = repos.slice(0, 5);
-        let totalCommits = 0;
+        let totalCommits = githubData.commits; // Start with what we have
         
         // Use Promise.all to fetch commits in parallel
         await Promise.all(reposToCheck.map(async (repo: any) => {
@@ -135,21 +169,37 @@ export async function GET(
           const commitMultiplier = Math.max(1, repos.length / reposToCheck.length);
           githubData.commits = Math.round(totalCommits * commitMultiplier);
           console.log(`Estimated total commits: ${githubData.commits}`);
-        } else {
-          // Fallback to a reasonable estimate based on repos and account age
-          const accountAgeInDays = Math.floor((new Date().getTime() - new Date(userData.created_at).getTime()) / (1000 * 60 * 60 * 24));
-          githubData.commits = Math.floor((accountAgeInDays / 30) * repos.length * 2);
-          console.log(`Using fallback commit estimate: ${githubData.commits}`);
         }
+      }
+      
+      // If we still don't have good commit data, use a reasonable estimate
+      if (githubData.commits < 10) {
+        // Fallback to a reasonable estimate based on repos and account age
+        const accountAgeInDays = additionalData.account_age_days;
+        const commitEstimate = Math.floor((accountAgeInDays / 30) * repos.length * 2);
+        githubData.commits = Math.max(commitEstimate, 10); // Ensure at least 10 commits
+        console.log(`Using fallback commit estimate: ${githubData.commits}`);
       }
     } else {
       console.log(`Could not fetch repositories: ${reposResponse.status}`);
     }
     
-    // Return both the user data and the calculated GitHub stats
+    // Sort languages by usage count
+    const sortedLanguages = Object.entries(languageStats)
+      .sort((a, b) => b[1] - a[1])
+      .reduce((obj, [key, value]) => {
+        obj[key] = value;
+        return obj;
+      }, {} as Record<string, number>);
+    
+    // Return both the user data, calculated GitHub stats, and additional profile info
     return NextResponse.json({
       ...userData,
-      githubStats: githubData
+      githubStats: githubData,
+      additionalData: {
+        ...additionalData,
+        languages: sortedLanguages
+      }
     });
   } catch (error) {
     console.error('Error in GitHub user API:', error);

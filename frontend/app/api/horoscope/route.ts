@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     // Generate a horoscope based on the GitHub data
     const horoscope = generateHoroscope(githubData);
     
-    // In a real app, we would store this in a database
+    // Log the generated horoscope
     console.log(`Generated horoscope for user ${userId}`);
     
     return NextResponse.json(horoscope);
