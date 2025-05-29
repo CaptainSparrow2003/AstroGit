@@ -11,7 +11,7 @@
 
 🌟 **Discover your coding destiny based on your GitHub activity** 🌟
 
-[Features](#-features) • [Demo](#-live-demo) • [Installation](#-installation) • [Usage](#-usage) • [Contributing](#-contributing)
+[Features](#-features) • [Demo](https://astrogit-frontend.onrender.com) • [Installation](#-installation) • [Usage](#-usage) • [Contributing](#-contributing)
 
 </div>
 
