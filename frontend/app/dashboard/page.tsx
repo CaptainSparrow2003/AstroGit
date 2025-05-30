@@ -45,7 +45,15 @@ function DashboardContent() {
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`Error ${response.status}:`, errorText);
-        throw new Error(`Failed to fetch GitHub data: ${response.status} ${errorText}`);
+        
+        // Provide more helpful error messages based on status code
+        if (response.status === 403) {
+          throw new Error('GitHub API rate limit exceeded. Please try again later or contact the site administrator.');
+        } else if (response.status === 404) {
+          throw new Error(`GitHub user '${username}' not found.`);
+        } else {
+          throw new Error(`Failed to fetch GitHub data: ${response.status} ${errorText}`);
+        }
       }
       
       const userData = await response.json();
@@ -80,6 +88,14 @@ function DashboardContent() {
         repos: 5,
         followers: 10
       });
+      
+      // Create minimal user data as fallback
+      if (!userData) {
+        setUserData({
+          login: username,
+          avatar_url: null
+        });
+      }
     } finally {
       setLoading(false);
     }

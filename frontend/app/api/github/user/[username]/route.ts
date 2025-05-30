@@ -9,11 +9,21 @@ export async function GET(
     // Get the username from URL params
     const username = params.username;
     
+    // Get GitHub token from environment variable
+    const githubToken = process.env.GITHUB_TOKEN;
+    
     // Create headers for GitHub API
-    const headers = {
+    const headers: HeadersInit = {
       'Accept': 'application/vnd.github.v3+json',
       'User-Agent': 'AstroGit-App'
     };
+    
+    // Add authorization if token is available
+    if (githubToken) {
+      headers['Authorization'] = `token ${githubToken}`;
+    } else {
+      console.warn('No GITHUB_TOKEN found in environment variables. Using unauthenticated requests (subject to rate limiting).');
+    }
     
     // Fetch basic user data
     console.log(`Fetching GitHub user data for: ${username}`);
@@ -99,7 +109,7 @@ export async function GET(
       githubData.stars = repos.reduce((total: number, repo: any) => total + (repo.stargazers_count || 0), 0);
       
       // Collect language data
-      const languagePromises = repos.slice(0, 10).map(async (repo: any) => {
+      for (const repo of repos.slice(0, 10)) {
         if (repo.language) {
           // If the repo already has a language field, use it
           languageStats[repo.language] = (languageStats[repo.language] || 0) + 1;
@@ -117,12 +127,6 @@ export async function GET(
             console.error(`Error fetching languages for ${repo.name}:`, error);
           }
         }
-      });
-      
-      try {
-        await Promise.all(languagePromises);
-      } catch (error) {
-        console.error('Error processing languages:', error);
       }
       
       // If event-based commit count is too low, estimate using repositories
@@ -131,8 +135,7 @@ export async function GET(
         const reposToCheck = repos.slice(0, 5);
         let totalCommits = githubData.commits; // Start with what we have
         
-        // Use Promise.all to fetch commits in parallel
-        await Promise.all(reposToCheck.map(async (repo: any) => {
+        for (const repo of reposToCheck) {
           try {
             // We need to specify the author in the query to only count this user's commits
             const commitsUrl = `https://api.github.com/repos/${repo.full_name}/commits?author=${username}&per_page=1`;
@@ -161,7 +164,7 @@ export async function GET(
           } catch (error) {
             console.error(`Error fetching commits for ${repo.full_name}:`, error);
           }
-        }));
+        }
         
         // If we have commit data, use it
         if (totalCommits > 0) {
@@ -174,7 +177,7 @@ export async function GET(
       
       // If we still don't have good commit data, use a reasonable estimate
       if (githubData.commits < 10) {
-          // Fallback to a reasonable estimate based on repos and account age
+        // Fallback to a reasonable estimate based on repos and account age
         const accountAgeInDays = additionalData.account_age_days;
         const commitEstimate = Math.floor((accountAgeInDays / 30) * repos.length * 2);
         githubData.commits = Math.max(commitEstimate, 10); // Ensure at least 10 commits
