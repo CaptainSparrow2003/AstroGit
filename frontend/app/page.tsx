@@ -91,18 +91,18 @@ export default function Home() {
               placeholder="Enter GitHub username"
               className="flex-grow px-4 py-3 rounded-md border border-gray-600 bg-black bg-opacity-50 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <button
+        <button
               type="submit"
               disabled={isLoading}
-              className={`px-8 py-3 border border-blue-600 bg-gradient-to-r from-blue-600 to-purple-600 rounded-md font-semibold text-white transition-all duration-200 ease-in-out ${
+          className={`px-8 py-3 border border-blue-600 bg-gradient-to-r from-blue-600 to-purple-600 rounded-md font-semibold text-white transition-all duration-200 ease-in-out ${
                 isLoading 
-                  ? 'opacity-70 cursor-not-allowed' 
-                  : 'hover:from-blue-700 hover:to-purple-700'
-              }`}
-            >
+              ? 'opacity-70 cursor-not-allowed' 
+              : 'hover:from-blue-700 hover:to-purple-700'
+          }`}
+        >
               {isLoading ? 'Loading...' : 'Get Horoscope'}
-            </button>
-          </div>
+        </button>
+        </div>
         </form>
       </div>
 

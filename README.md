@@ -52,7 +52,7 @@ Experience AstroGit in action: [https://astrogit.vercel.app](https://astrogit.ve
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/AstroGit.git
+git clone https://github.com/Nandanaaaaaa/AstroGit.git
 cd AstroGit
 ```
 

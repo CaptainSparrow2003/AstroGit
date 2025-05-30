@@ -174,7 +174,7 @@ export async function GET(
       
       // If we still don't have good commit data, use a reasonable estimate
       if (githubData.commits < 10) {
-        // Fallback to a reasonable estimate based on repos and account age
+          // Fallback to a reasonable estimate based on repos and account age
         const accountAgeInDays = additionalData.account_age_days;
         const commitEstimate = Math.floor((accountAgeInDays / 30) * repos.length * 2);
         githubData.commits = Math.max(commitEstimate, 10); // Ensure at least 10 commits

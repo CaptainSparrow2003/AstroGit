@@ -7,10 +7,7 @@ import HoroscopeCard from '@/components/HoroscopeCard';
 import { GithubData, Horoscope } from '@/types/horoscope';
 import Link from 'next/link';
 
-// Force this page to be dynamically rendered
-export const dynamic = "force-dynamic";
-
-// Create a client component that uses searchParams
+// Component to handle params after Suspense boundary
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -370,17 +367,15 @@ function DashboardContent() {
   );
 }
 
-// Main page component with Suspense
+// Main dashboard component with Suspense
 export default function Dashboard() {
   return (
-    <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center starry-bg">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Loading dashboard...</h1>
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-        </div>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center starry-bg">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold mb-4">Loading dashboard...</h1>
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
       </div>
-    }>
+    </div>}>
       <DashboardContent />
     </Suspense>
   );
