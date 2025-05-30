@@ -39,7 +39,7 @@ No authentication required - just pure cosmic coding insights!
 
 ## 🌐 Live Demo
 
-Experience AstroGit in action: [https://astrogit.vercel.app](https://astrogit.vercel.app)
+Experience AstroGit in action: [astrogit](https://astrogit-frontend.onrender.com)
 
 ## 📋 Prerequisites
 
